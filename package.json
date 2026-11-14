@@ -1,0 +1,22 @@
+{
+  "name": "infraccion-scrapper",
+  "version": "0.1.0",
+  "description": "Consulta infracciones por patente en el sitio de la ANSV y devuelve un JSON con actas y subtotal sin descuento.",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "src/index.js",
+  "bin": {
+    "infracciones": "src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "test:e2e": "node --test \"test/e2e/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cheerio": "1.0.0",
+    "playwright": "1.65.1"
+  }
+}

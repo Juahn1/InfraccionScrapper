@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Agencia Nacional de Seguridad Vial - Consulta de infracciones (formulario de prueba)</title></head>
+<body>
+<div id="divGrilla" class="container">
+  <div id="divParent" class="row">
+    <div id="ctl00_ContentPlaceHolder1_dDominio" class="BotonesCuadrados btn btn-tab"><span>BUSQUEDA POR DOMINIO</span></div>
+    <input name="ctl00$ContentPlaceHolder1$txDominio" type="text" maxlength="7" id="ctl00_ContentPlaceHolder1_txDominio" class="form-control" placeholder="Dominio" />
+    <button type="button" id="btnBuscarFake" class="btn btn-lg btn-primary registroSession"
+            onclick="fetch(location.href, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'dominio=' + encodeURIComponent(document.getElementById('ctl00_ContentPlaceHolder1_txDominio').value) });">Consultar infracciones</button>
+  </div>
+</div>
+</body>
+</html>

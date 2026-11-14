@@ -1,0 +1,32 @@
+
+> infraccion-scrapper@0.1.0 test:e2e
+> node --test "test/e2e/**/*.test.js"
+
+✔ 01 flujo completo: el JSON tiene dominio, dos actas y subtotal 51500.5 (940.4591ms)
+✔ 02 acta con descuento: importe del encabezado e importe sin descuento se separan (852.0064ms)
+✔ 03 acta sin línea de descuento: importeSinDescuento es null y el importe sale del encabezado (799.6541ms)
+✔ 04 tipo de infracción completo, lugar y juzgado llegan al resultado (779.7569ms)
+✔ 05 montos del JSON son números, no texto con formato argentino (880.086ms)
+✔ 06 patente sin actas: lista vacía, subtotal 0 y mensaje, sin error (893.2435ms)
+✔ 07 página ajena: estructura no reconocida, sin esperar al timeout (886.8051ms)
+✔ 08 respuesta 500 a la búsqueda: sitio no disponible (838.9672ms)
+✔ 09 respuesta 503 al cargar el sitio: sitio no disponible (565.8435ms)
+✔ 10 búsqueda abortada por la red: sitio no disponible (3871.3695ms)
+✔ 11 respuesta más lenta que el timeout: sitio no disponible (1862.8928ms)
+✔ 12 patente de 8 caracteres: rechazada sin abrir el navegador ni consultar el sitio (0.9192ms)
+✔ 13 el navegador se cierra después de una consulta exitosa (925.862ms)
+✔ 14 el navegador se cierra aunque la consulta falle (3830.5196ms)
+✔ 15 CLI con flujo simulado: código 0 y JSON válido por stdout (946.1731ms)
+✔ 16 CLI con falla del sitio: código 1, stdout vacío y log sin la patente (859.5028ms)
+﹣ 17 [vivo] patente autorizada: hay actas y cada una trae número, importe, tipo, lugar y juzgado (0.4532ms) # Solo con RUN_LIVE=1 (consulta el sitio real)
+﹣ 18 [vivo] consultas repetidas: mismo conjunto de actas y mismo subtotal (0.227ms) # Solo con RUN_LIVE=1 (consulta el sitio real)
+﹣ 19 [vivo] patente sin actas (ZZZ000): mensaje y subtotal 0 (0.1331ms) # Solo con RUN_LIVE=1 (consulta el sitio real)
+﹣ 20 [vivo] patente sin actas (XYZ123): mensaje y subtotal 0 (0.124ms) # Solo con RUN_LIVE=1 (consulta el sitio real)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 21277.734
