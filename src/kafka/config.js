@@ -46,7 +46,7 @@ function leerConfig(env = process.env) {
     esperaReintentoMs: entero(env.KAFKA_ESPERA_REINTENTO_SEGUNDOS, 2, 'KAFKA_ESPERA_REINTENTO_SEGUNDOS') * 1000,
     // Una consulta a la vez y con esta pausa mínima entre una y otra, para no saturar a la ANSV ni que nos bloqueen.
     pausaEntreConsultasMs: entero(env.MULTAS_PAUSA_ENTRE_CONSULTAS_SEGUNDOS, 5, 'MULTAS_PAUSA_ENTRE_CONSULTAS_SEGUNDOS') * 1000,
-    puerto: entero(env.PORT, 8086, 'PORT'),
+    puerto: entero(env.PORT, 8087, 'PORT'),
   };
 }
 

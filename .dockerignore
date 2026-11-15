@@ -1,0 +1,10 @@
+node_modules/
+.git/
+.claude/
+test/
+docs/
+openspec/
+*.log
+.env
+Dockerfile
+.dockerignore

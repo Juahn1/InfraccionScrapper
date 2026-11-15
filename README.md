@@ -134,3 +134,15 @@ multas ──MultasConsultadas / ConsultaMultasFallida──► crm.eventos ─�
 - Aiven no crea tópicos solos: el servicio crea los tres al arrancar.
 
 Los tests (`pnpm test`) cubren el manejador, el sobre, el limitador y la configuración con dobles de prueba; no tocan la ANSV ni Kafka.
+
+### Docker
+
+```bash
+docker build -t multas .
+docker run --rm -p 8087:8087 --env-file .env multas
+```
+
+- La imagen parte de la oficial de Playwright (trae Chromium) con la **misma versión que el `playwright` de package.json** y fijada por digest: si se actualiza uno, se actualiza el otro.
+- Corre con el usuario sin privilegios `pwuser`. Con ese usuario Chromium no puede armar su sandbox, por eso la imagen define `CHROMIUM_SIN_SANDBOX=true` (la CLI y el servicio lo leen). Fuera de Docker no hace falta.
+- Pesa unos 3,7 GB: tené en cuenta el plan free de Render.
+- `HEALTHCHECK` contra `/health`.

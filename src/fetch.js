@@ -21,7 +21,8 @@ const TIMEOUT_MS = 60000;
  * - Falla del sitio (no responde, 5xx o timeout) -> ErrorSitioNoDisponible.
  */
 async function buscarPorDominio(entrada, {
-  lanzarNavegador = () => chromium.launch({ headless: true }),
+  // CHROMIUM_SIN_SANDBOX=true: dentro de un contenedor sin privilegios Chromium no puede armar su sandbox.
+  lanzarNavegador = () => chromium.launch({ headless: true, chromiumSandbox: process.env.CHROMIUM_SIN_SANDBOX !== 'true' }),
   timeoutMs = TIMEOUT_MS,
 } = {}) {
   const patente = validarPatente(entrada);
