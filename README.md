@@ -12,14 +12,14 @@ Consulta las infracciones de tránsito asociadas a una patente en el sitio públ
 ## Instalación
 
 ```bash
-npm install
-npx playwright install chromium
+pnpm install
+pnpm exec playwright install chromium
 ```
 
 ## Uso
 
 ```bash
-node src/cli.js AAA111
+pnpm exec node src/cli.js AAA111
 ```
 
 Para guardar el resultado en un archivo:
@@ -88,16 +88,16 @@ Lanza `ErrorValidacionPatente`, `ErrorSitioNoDisponible` o `ErrorEstructuraNoRec
 | `La patente no puede tener más de 7 caracteres.` | Patente demasiado larga | Revisar la patente |
 | `tipo=ErrorSitioNoDisponible` | El sitio no respondió, devolvió 5xx o superó el tiempo de espera | Reintentar más tarde; verificar que el sitio abre en el navegador |
 | `tipo=ErrorEstructuraNoReconocida` | El sitio cambió su HTML | Revisar `src/parse.js` y los fixtures; correr las pruebas en vivo |
-| No se encuentra Chromium | No se instaló el navegador de Playwright | Ejecutar `npx playwright install chromium` |
+| No se encuentra Chromium | No se instaló el navegador de Playwright | Ejecutar `pnpm exec playwright install chromium` |
 
 Si el comando devuelve `infracciones: []` con `mensaje`, la patente no tiene multas registradas: no es un error.
 
 ## Pruebas
 
 ```bash
-npm test                      # 20 pruebas unitarias: parseo, formato, validación, CLI
-npm run test:e2e              # 16 pruebas end-to-end con la red del sitio simulada (no consultan el sitio)
-RUN_LIVE=1 npm run test:e2e   # 20 pruebas end-to-end, incluidas 4 contra el sitio real
+pnpm test                     # 20 pruebas unitarias: parseo, formato, validación, CLI
+pnpm run test:e2e             # 16 pruebas end-to-end con la red del sitio simulada (no consultan el sitio)
+RUN_LIVE=1 pnpm run test:e2e  # 20 pruebas end-to-end, incluidas 4 contra el sitio real
 ```
 
 - Las pruebas unitarias y las simuladas no requieren conexión al sitio. Usan fixtures sintéticos en `test/fixtures/`.
@@ -144,5 +144,5 @@ docker run --rm -p 8087:8087 --env-file .env multas
 
 - La imagen parte de la oficial de Playwright (trae Chromium) con la **misma versión que el `playwright` de package.json** y fijada por digest: si se actualiza uno, se actualiza el otro.
 - Corre con el usuario sin privilegios `pwuser`. Con ese usuario Chromium no puede armar su sandbox, por eso la imagen define `CHROMIUM_SIN_SANDBOX=true` (la CLI y el servicio lo leen). Fuera de Docker no hace falta.
-- Pesa unos 3,7 GB: tené en cuenta el plan free de Render.
+- Pesa unos 3,7 GB. Medido con 512 MB de límite (como Render free): una consulta real usa unos 290 MiB de pico, sin OOM.
 - `HEALTHCHECK` contra `/health`.

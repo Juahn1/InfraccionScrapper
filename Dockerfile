@@ -6,7 +6,9 @@ FROM mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791c
 ENV NODE_ENV=production \
     PORT=8087 \
     # Dentro del contenedor, con un usuario sin privilegios, Chromium no puede armar su sandbox de usuario.
-    CHROMIUM_SIN_SANDBOX=true
+    CHROMIUM_SIN_SANDBOX=true \
+    # CA de Aiven, copiada en la imagen (más abajo).
+    KAFKA_SSL_CAFILE=/app/ca.pem
 
 WORKDIR /app
 
@@ -17,6 +19,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 COPY src ./src
+# Certificado de la CA del proyecto de Aiven (público; es el mismo que usan los demás servicios).
+COPY ca.pem ./ca.pem
 
 # `pwuser` es el usuario sin privilegios que ya trae la imagen de Playwright.
 USER pwuser
