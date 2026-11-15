@@ -2,7 +2,7 @@
 
 const { chromium } = require('playwright');
 const { validarPatente } = require('./validar');
-const { ErrorSitioNoDisponible } = require('./errors');
+const { ErrorSitioNoDisponible, ErrorTiempoAgotado } = require('./errors');
 
 const URL_SITIO = 'https://consultainfracciones.seguridadvial.gob.ar/';
 const SEL = {
@@ -18,14 +18,18 @@ const TIMEOUT_MS = 60000;
  * - El HTML sale del cuerpo de la respuesta al POST de la búsqueda, no del DOM de la página:
  *   el contenedor de resultados ya existe antes de buscar, así que leer el DOM podría dar la página vieja.
  * - `lanzarNavegador` y `timeoutMs` son inyectables para pruebas.
+ * - `signal` (AbortSignal) cancela la consulta: al dispararse se cierra el navegador
+ *   y se lanza ErrorTiempoAgotado. Sin señal el comportamiento no cambia.
  * - Falla del sitio (no responde, 5xx o timeout) -> ErrorSitioNoDisponible.
  */
 async function buscarPorDominio(entrada, {
   // CHROMIUM_SIN_SANDBOX=true: dentro de un contenedor sin privilegios Chromium no puede armar su sandbox.
   lanzarNavegador = () => chromium.launch({ headless: true, chromiumSandbox: process.env.CHROMIUM_SIN_SANDBOX !== 'true' }),
   timeoutMs = TIMEOUT_MS,
+  signal,
 } = {}) {
   const patente = validarPatente(entrada);
+  if (signal?.aborted) throw new ErrorTiempoAgotado();
 
   let navegador;
   try {
@@ -33,6 +37,10 @@ async function buscarPorDominio(entrada, {
   } catch (err) {
     throw new ErrorSitioNoDisponible(`No se pudo iniciar el navegador: ${err.message}`);
   }
+
+  // Cerrar el navegador hace fallar las operaciones de Playwright en curso.
+  const alAbortar = () => { navegador.close().catch(() => {}); };
+  if (signal) signal.addEventListener('abort', alAbortar, { once: true });
 
   try {
     const pagina = await navegador.newPage();
@@ -61,12 +69,14 @@ async function buscarPorDominio(entrada, {
 
     return await respuestaBusqueda.text();
   } catch (err) {
+    if (signal?.aborted) throw new ErrorTiempoAgotado();
     if (err instanceof ErrorSitioNoDisponible) throw err;
     if (err.name === 'TimeoutError') {
       throw new ErrorSitioNoDisponible(`El sitio no respondió a tiempo: ${err.message.split('\n')[0]}`);
     }
     throw new ErrorSitioNoDisponible(`Falla al consultar el sitio: ${err.message.split('\n')[0]}`);
   } finally {
+    if (signal) signal.removeEventListener('abort', alAbortar);
     await navegador.close().catch(() => {});
   }
 }

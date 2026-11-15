@@ -57,6 +57,27 @@ Al escribir las pruebas se encontró un problema en `src/fetch.js`:
 - **Corrección:** el HTML de resultados se toma del cuerpo de la respuesta al POST de la búsqueda. Se agregó `timeoutMs` configurable.
 - **Verificación:** la prueba 07 comprueba que el error de estructura se reporta sin esperar al timeout. Las pruebas en vivo 17 a 20 confirman que la consulta real sigue funcionando con el cambio.
 
+## Endpoint HTTP `GET /getMultasPorDominio` (change `exponer-get-multas-por-dominio`, tarea 4.1)
+
+**Fecha:** 2026-11-15
+**Entorno:** Windows 11 Pro, Node.js 24.18.0, timeout total por defecto (10 s), servidor en 127.0.0.1 con puerto efímero.
+**Método:** 10 peticiones secuenciales al endpoint real: rotación de una patente autorizada y dos patentes sin actas, como en las pruebas en vivo. Script auxiliar fuera del repo; solo se registraron código HTTP y duración.
+
+| Resultado | Cantidad |
+| --- | --- |
+| 200 | 10 |
+| 504 (timeout total) | 0 |
+| Otros códigos | 0 |
+
+| Métrica de duración | Valor |
+| --- | --- |
+| Mínimo | 2,7 s |
+| Mediana | 2,9 s |
+| Máximo | 6,5 s (primera consulta, arranque en frío del navegador) |
+
+- Con el timeout de 10 s, el margen sobre el máximo observado es de unos 3,5 s. Sobre la mediana, de unos 7 s.
+- Con 10 muestras no se estima un percentil alto. Si aparecen 504 en uso real, el valor se sube con `INFRACCIONES_TIMEOUT_SEGUNDOS`.
+
 ## Notas sobre datos personales
 
 - Las pruebas en vivo consultan dos patentes sin actas y una patente autorizada por el usuario. Esta documentación no incluye montos, números de acta ni lugares de las actas.

@@ -65,7 +65,8 @@ node src/cli.js AAA111 > resultado.json
 ## Alcance
 
 - Consulta por patente (dominio). No consulta por DNI.
-- Una patente por ejecución.
+- Una patente por ejecución en la CLI. El servidor HTTP atiende una consulta a la vez.
+- Se puede usar desde la CLI, desde código o mediante un endpoint HTTP local (`GET /getMultasPorDominio`); ver [Servidor HTTP](#servidor-http). El endpoint es un proceso aparte del servicio Kafka y no depende de él.
 - Usa un navegador real (Chromium vía Playwright) para ejecutar la página como lo haría una persona.
 
 ## Uso desde código
@@ -78,6 +79,51 @@ console.log(resultado.subtotal);
 ```
 
 Lanza `ErrorValidacionPatente`, `ErrorSitioNoDisponible` o `ErrorEstructuraNoReconocida` (definidos en `src/errors.js`) según la causa del fallo.
+
+## Servidor HTTP
+
+Servicio HTTP paralelo al servicio de Kafka: es otro proceso, con su propio punto de entrada (`src/server.js`) y su propia configuración. No importa nada de `src/kafka/`, no usa `PORT` ni consume de Kafka, y el servicio `multas` no depende de él.
+
+> **Advertencia de datos personales:** el endpoint devuelve multas asociadas a una patente y no tiene autenticación. Por defecto escucha solo en `127.0.0.1`. Exponerlo en la red es una decisión tuya y queda bajo tu responsabilidad.
+
+Arranque:
+
+```bash
+pnpm run servidor
+```
+
+Consulta:
+
+```bash
+curl "http://127.0.0.1:3000/getMultasPorDominio?dominio=AAA111"
+```
+
+La respuesta 200 es el mismo JSON de la sección de salida, con `dominio`, `infracciones` y `subtotal`. Una patente sin multas devuelve `subtotal: 0` y el campo `mensaje`.
+
+### Variables de entorno
+
+| Variable | Default | Qué hace |
+| --- | --- | --- |
+| `INFRACCIONES_HTTP_PORT` | `3000` | Puerto donde escucha el servidor |
+| `INFRACCIONES_HTTP_HOST` | `127.0.0.1` | Dirección de escucha. Cambiarla expone el endpoint en esa interfaz |
+| `INFRACCIONES_TIMEOUT_SEGUNDOS` | `10` | Tiempo total por consulta, incluida la espera en cola. Debe ser mayor que cero |
+
+Un valor inválido impide arrancar el servidor (código de salida 2) y el error indica la variable.
+
+### Códigos de respuesta
+
+| Código | Cuándo | Cuerpo `error` |
+| --- | --- | --- |
+| 200 | Consulta correcta (también si no hay multas) | — |
+| 400 | Falta `dominio`, está vacío o tiene más de 7 caracteres | `Parámetro dominio inválido.` |
+| 404 | Otra ruta distinta de `/getMultasPorDominio` | `Ruta no encontrada.` |
+| 405 | Método distinto de GET (la respuesta incluye `Allow: GET`) | `Método no permitido.` |
+| 422 | El sitio cambió su estructura | `La página del sitio no tiene la estructura esperada; posible cambio del sitio.` |
+| 500 | Error interno | `Error interno al consultar.` |
+| 502 | El sitio no respondió o devolvió un error del servidor | `Falla del sitio de consulta.` |
+| 504 | Se venció el tiempo total de la consulta; el navegador se cierra | `Se venció el tiempo total de la consulta.` |
+
+Las consultas se atienden de a una, en orden de llegada. El log de cada request solo muestra estado, cantidad de actas o tipo de error: nunca la patente, números de acta ni importes.
 
 ## Solución de problemas
 
@@ -95,7 +141,7 @@ Si el comando devuelve `infracciones: []` con `mensaje`, la patente no tiene mul
 ## Pruebas
 
 ```bash
-pnpm test                     # 20 pruebas unitarias: parseo, formato, validación, CLI
+pnpm test                      # pruebas unitarias: parseo, formato, validación, CLI, cancelación, servidor HTTP y configuración
 pnpm run test:e2e             # 16 pruebas end-to-end con la red del sitio simulada (no consultan el sitio)
 RUN_LIVE=1 pnpm run test:e2e  # 20 pruebas end-to-end, incluidas 4 contra el sitio real
 ```
