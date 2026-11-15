@@ -151,6 +151,37 @@ test('un comando sin vehiculoId va a la DLT', async () => {
   assert.equal(e.consultas.length, 0);
 });
 
+test('un Comando ConsultarMultas con leadId (patente del lead) responde usando leadId como clave', async () => {
+  const e = entorno();
+  const leadId = 'b6d4c1e2-0000-4000-8000-000000000009';
+  const mensaje = {
+    eventId: 'e-2', eventType: 'ConsultarMultas', version: 1, occurredAt: '2026-11-15T12:00:00Z',
+    timestamp: '2026-11-15T12:00:00Z', correlationId: 'cid-2', destino: 'multas',
+    payload: { leadId, patente: 'AB123CD' },
+  };
+  assert.equal(await atenderComando({ clave: leadId, valor: valorDe(mensaje) }, e.deps, CONFIG), 'consultada');
+
+  assert.deepEqual(e.consultas, ['AB123CD']);
+  const { clave, sobre } = e.eventos[0];
+  assert.equal(clave, leadId);
+  assert.equal(sobre.eventType, 'MultasConsultadas');
+  assert.equal(sobre.correlationId, 'cid-2');
+  assert.deepEqual(sobre.payload, { leadId, dominio: 'AB123CD', infracciones: [ACTA], subtotal: 39000 });
+  assert.equal(e.dlt.length, 0);
+});
+
+test('una consulta fallida con leadId responde ConsulaMultasFallida con leadId', async () => {
+  const e = entorno({ consultar: async () => { throw new ErrorSitioNoDisponible('timeout'); } });
+  const leadId = 'b6d4c1e2-0000-4000-8000-000000000009';
+  const mensaje = {
+    eventId: 'e-3', eventType: 'ConsultarMultas', version: 1, occurredAt: '2026-11-15T12:00:00Z',
+    timestamp: '2026-11-15T12:00:00Z', correlationId: 'cid-3', destino: 'multas',
+    payload: { leadId, patente: 'AB123CD' },
+  };
+  assert.equal(await atenderComando({ clave: leadId, valor: valorDe(mensaje) }, e.deps, CONFIG), 'fallida');
+  assert.deepEqual(e.eventos[0].sobre.payload, { leadId, motivo: 'SITIO_NO_DISPONIBLE', reintentable: true });
+});
+
 test('el log no lleva la patente, las actas ni los importes', async () => {
   const exitosa = entorno();
   await atender(exitosa, comando());
