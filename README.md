@@ -103,3 +103,46 @@ RUN_LIVE=1 npm run test:e2e   # 20 pruebas end-to-end, incluidas 4 contra el sit
 - Las pruebas unitarias y las simuladas no requieren conexión al sitio. Usan fixtures sintéticos en `test/fixtures/`.
 - Las pruebas en vivo consultan el sitio real: ejecutarlas con moderación.
 - Resultados documentados en [`docs/pruebas/RESULTADOS.md`](docs/pruebas/RESULTADOS.md), con las salidas crudas en `docs/pruebas/`.
+
+## Servicio de multas por Kafka
+
+Además de la librería y la CLI, el repo es el servicio **`multas`** del ecosistema CRM: atiende los comandos del orquestador por Kafka y le responde con eventos. Contrato completo: `docs/08-contrato-tres-topicos.md` (§3, §4 y §7) del repositorio del orquestador.
+
+```bash
+pnpm install
+pnpm exec playwright install chromium   # solo la primera vez, para consultar la ANSV de verdad
+pnpm start                              # lee las variables de .env.example (exportadas en el entorno)
+```
+
+```text
+orquestador ──ConsultarMultas──► crm.comandos ──► multas ──consulta la ANSV (Playwright)
+multas ──MultasConsultadas / ConsultaMultasFallida──► crm.eventos ──► orquestador
+```
+
+| Mensaje | Dónde | Contenido |
+| --- | --- | --- |
+| `ConsultarMultas` (entra) | `crm.comandos`, `destino: multas` | `vehiculoId`, `patente`. Los comandos con otro `destino` u otro `eventType` se ignoran |
+| `MultasConsultadas` (sale) | `crm.eventos`, clave `vehiculoId` | `vehiculoId`, `dominio`, `infracciones[]`, `subtotal` y, sin multas, `mensaje`. Una patente sin multas es un resultado válido |
+| `ConsultaMultasFallida` (sale) | `crm.eventos`, clave `vehiculoId` | `vehiculoId`, `motivo`, `reintentable` |
+
+- Los mensajes llevan el sobre común (`eventId`, `eventType`, `version`, `occurredAt`, `timestamp`, `correlationId`, `payload`) y la respuesta conserva el `correlationId` del comando.
+- **Errores de la consulta:** `ErrorSitioNoDisponible` → `SITIO_NO_DISPONIBLE`, reintentable (el orquestador reintenta con espera creciente); `ErrorEstructuraNoReconocida` → `ESTRUCTURA_NO_RECONOCIDA`, no reintentable (el sitio cambió: hay que alertar y revisar los selectores); `ErrorValidacionPatente` → `PATENTE_INVALIDA`, no reintentable.
+- **Errores inesperados** (o no poder publicar la respuesta): se reintenta `KAFKA_REINTENTOS_COMANDO` veces con espera creciente y después el comando va a `crm.dlt` tal como llegó. Un mensaje que no es JSON, o sin `vehiculoId`, va directo a la DLT.
+- **Concurrencia:** una consulta a la vez, con una pausa mínima de `MULTAS_PAUSA_ENTRE_CONSULTAS_SEGUNDOS` entre una y otra.
+- **Datos personales:** el log del servicio no incluye patente, actas ni importes (solo el `vehiculoId`, el estado, el motivo y la cantidad de actas).
+- `GET /health` en `PORT` (`UP` cuando el consumidor está conectado).
+- Aiven no crea tópicos solos: el servicio crea los tres al arrancar.
+
+Los tests (`pnpm test`) cubren el manejador, el sobre, el limitador y la configuración con dobles de prueba; no tocan la ANSV ni Kafka.
+
+### Docker
+
+```bash
+docker build -t multas .
+docker run --rm -p 8087:8087 --env-file .env multas
+```
+
+- La imagen parte de la oficial de Playwright (trae Chromium) con la **misma versión que el `playwright` de package.json** y fijada por digest: si se actualiza uno, se actualiza el otro.
+- Corre con el usuario sin privilegios `pwuser`. Con ese usuario Chromium no puede armar su sandbox, por eso la imagen define `CHROMIUM_SIN_SANDBOX=true` (la CLI y el servicio lo leen). Fuera de Docker no hace falta.
+- Pesa unos 3,7 GB: tené en cuenta el plan free de Render.
+- `HEALTHCHECK` contra `/health`.
