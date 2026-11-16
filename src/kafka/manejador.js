@@ -19,7 +19,8 @@ function traducirError(err) {
  * Atiende un mensaje de `crm.comandos`.
  *
  * - Ignora lo que no es `ConsultarMultas` con `destino: multas`.
- * - Responde en `crm.eventos` con `MultasConsultadas` o `ConsultaMultasFallida` (mismo correlationId, clave vehiculoId).
+ * - Responde en `crm.eventos` con `MultasConsultadas` o `ConsultaMultasFallida` (mismo correlationId y la misma
+ *   clave de negocio que el comando: `vehiculoId` para una unidad en stock o `leadId` para la patente de un lead).
  *   Una patente sin multas es un resultado válido. Los errores conocidos del sitio se informan, no se reintentan acá:
  *   el orquestador decide los reintentos y su espera.
  * - Un error inesperado, o no poder publicar la respuesta, se reintenta (`reintentos` veces, con espera creciente) y
@@ -40,9 +41,15 @@ async function atenderComando({ clave, valor }, deps, config) {
   if (mensaje.eventType !== COMANDO || mensaje.destino !== config.servicio) return 'ignorado';
 
   const payload = mensaje.payload && typeof mensaje.payload === 'object' ? mensaje.payload : {};
+
+  // Clave de negocio del comando: una unidad en stock (vehiculoId) o la patente
+  // de un lead (leadId). Se usa la misma para la respuesta y como clave del evento.
   const vehiculoId = typeof payload.vehiculoId === 'string' && payload.vehiculoId ? payload.vehiculoId : null;
-  if (vehiculoId === null) {
-    log('warn', 'ConsultarMultas sin vehiculoId: se manda a la DLT.');
+  const leadId = typeof payload.leadId === 'string' && payload.leadId ? payload.leadId : null;
+  const campoClave = vehiculoId !== null ? 'vehiculoId' : 'leadId';
+  const claveNegocio = vehiculoId !== null ? vehiculoId : leadId;
+  if (claveNegocio === null) {
+    log('warn', 'ConsultarMultas sin vehiculoId ni leadId: se manda a la DLT.');
     await publicarDlt(clave, valor);
     return 'dlt';
   }
@@ -50,28 +57,28 @@ async function atenderComando({ clave, valor }, deps, config) {
   let respuesta = null; // { eventType, payload }, se calcula una sola vez
   for (let intento = 1; intento <= config.reintentos; intento += 1) {
     try {
-      if (respuesta === null) respuesta = await resolver(vehiculoId, payload.patente, consultar, log);
-      await publicarEvento(vehiculoId, armarSobre(respuesta.eventType, respuesta.payload, mensaje.correlationId));
+      if (respuesta === null) respuesta = await resolver(campoClave, claveNegocio, payload.patente, consultar, log);
+      await publicarEvento(claveNegocio, armarSobre(respuesta.eventType, respuesta.payload, mensaje.correlationId));
       return respuesta.eventType === MULTAS_CONSULTADAS ? 'consultada' : 'fallida';
     } catch (err) {
       // Solo el tipo: el mensaje puede arrastrar detalles del sitio o de la patente.
-      log('warn', `Intento ${intento}/${config.reintentos} fallido vehiculoId=${vehiculoId} tipo=${err.name}`);
+      log('warn', `Intento ${intento}/${config.reintentos} fallido ${campoClave}=${claveNegocio} tipo=${err.name}`);
       if (intento < config.reintentos) await dormir(config.esperaReintentoMs * 2 ** (intento - 1));
     }
   }
-  log('error', `Se agotaron los intentos vehiculoId=${vehiculoId}: el comando va a la DLT.`);
+  log('error', `Se agotaron los intentos ${campoClave}=${claveNegocio}: el comando va a la DLT.`);
   await publicarDlt(clave, valor);
   return 'dlt';
 }
 
-async function resolver(vehiculoId, patente, consultar, log) {
+async function resolver(campoClave, claveNegocio, patente, consultar, log) {
   try {
     const resultado = await consultar(patente);
-    log('info', `Consulta completada vehiculoId=${vehiculoId} estado=ok actas=${resultado.infracciones.length}`);
+    log('info', `Consulta completada ${campoClave}=${claveNegocio} estado=ok actas=${resultado.infracciones.length}`);
     return {
       eventType: MULTAS_CONSULTADAS,
       payload: {
-        vehiculoId,
+        [campoClave]: claveNegocio,
         dominio: resultado.dominio,
         infracciones: resultado.infracciones,
         subtotal: resultado.subtotal,
@@ -82,8 +89,8 @@ async function resolver(vehiculoId, patente, consultar, log) {
     const traducido = traducirError(err);
     if (traducido === null) throw err;
     const nivel = traducido.reintentable ? 'warn' : 'error';
-    log(nivel, `Consulta fallida vehiculoId=${vehiculoId} estado=error motivo=${traducido.motivo}`);
-    return { eventType: CONSULTA_FALLIDA, payload: { vehiculoId, ...traducido } };
+    log(nivel, `Consulta fallida ${campoClave}=${claveNegocio} estado=error motivo=${traducido.motivo}`);
+    return { eventType: CONSULTA_FALLIDA, payload: { [campoClave]: claveNegocio, ...traducido } };
   }
 }
 
